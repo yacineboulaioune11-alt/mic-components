@@ -24,6 +24,7 @@ export type CountrySelectProps = {
   placeholder?: string;
   disabled?: boolean;
   id?: string;
+  infoMessage?: React.ReactNode; // Optional helper/error content rendered below the field
 };
 
 const COUNTRIES: string[] = [
@@ -251,8 +252,10 @@ export default function CountrySelect({
   placeholder = "",
   disabled,
   id = "country-select",
+  infoMessage,
 }: CountrySelectProps) {
   const labelId = `${id}-label`;
+  const helperId = `${id}-helper`;
   const [open, setOpen] = React.useState(false);
   const [anchorEl, setAnchorEl] = React.useState<HTMLDivElement | null>(null);
   const anchorNodeRef = React.useRef<HTMLDivElement | null>(null);
@@ -457,6 +460,7 @@ export default function CountrySelect({
           aria-haspopup="menu"
           aria-expanded={open ? "true" : undefined}
           aria-labelledby={labelId}
+          aria-describedby={infoMessage ? helperId : undefined}
           onClick={() => !disabled && setOpen((v) => !v)}
           onKeyDown={handleKeyDown}
           sx={{ position: "relative", width: "100%" }}
@@ -652,6 +656,22 @@ export default function CountrySelect({
           </ClickAwayListener>
         </Popper>
       </FormControl>
+
+      {infoMessage && (
+        <Box
+          id={helperId}
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+            mt: 0.75,
+            color: "#d32f2f", // default error red; child component can override
+            fontSize: 14,
+          }}
+        >
+          {infoMessage}
+        </Box>
+      )}
     </Box>
   );
 }
