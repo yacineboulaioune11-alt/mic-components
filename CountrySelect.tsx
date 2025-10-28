@@ -3,18 +3,13 @@
 import * as React from "react";
 import {
   Box,
-  ClickAwayListener,
   FormControl,
-  ListItemText,
-  MenuItem,
-  MenuList,
   OutlinedInput,
-  Paper,
-  Popper,
   Typography,
   SvgIcon,
   type SvgIconProps,
 } from "@mui/material";
+import AttachedDropdown from "./AttachedDropdown";
 
 export type CountrySelectProps = {
   value: string | "";
@@ -263,164 +258,31 @@ export default function CountrySelect({
     anchorNodeRef.current = node;
     setAnchorEl(node);
   }, []);
-  const listRef = React.useRef<HTMLUListElement | null>(null);
-  const [menuWidth, setMenuWidth] = React.useState<number | undefined>(undefined);
-  const typeBufferRef = React.useRef("");
-  const clearTypeTimerRef = React.useRef<number | null>(null);
-  const lastKeyPressedRef = React.useRef<string>("");
-  // Custom overlay scrollbar state
-  const scrollContainerRef = React.useRef<HTMLDivElement | null>(null);
-  const [thumbNeeded, setThumbNeeded] = React.useState(false);
-  const [thumbVisible, setThumbVisible] = React.useState(false);
-  const thumbHideTimerRef = React.useRef<number | null>(null);
-  const thumbRef = React.useRef<HTMLDivElement | null>(null);
-  const thumbVisibleRef = React.useRef(false);
-  const scrollRafRef = React.useRef<number | null>(null);
-
-  React.useEffect(() => {
-    if (!anchorEl) return;
-    const update = () => setMenuWidth(anchorEl.clientWidth);
-    update();
-    const ro = new ResizeObserver(update);
-    ro.observe(anchorEl);
-    return () => ro.disconnect();
-  }, [anchorEl]);
+  const menuId = `${id}-menu`;
 
   const handleSelect = (next: string) => {
     onChange(next);
     setOpen(false);
     // Return focus to the field after selection
     anchorNodeRef.current?.focus();
-  };  const handleKeyDown: React.KeyboardEventHandler = (e) => {
+  };
+
+  const handleKeyDown: React.KeyboardEventHandler = (e) => {
     if (!open && (e.key === "ArrowDown" || e.key === "Enter" || e.key === " " )) {
       e.preventDefault();
       setOpen(true);
       // Focus the first item after open
       requestAnimationFrame(() => {
-        const first = listRef.current?.querySelector('[role="menuitem"]') as HTMLElement | null;
+        const list = document.getElementById(menuId);
+        const first = list?.querySelector('[role="menuitem"]') as HTMLElement | null;
         first?.focus();
       });
       return;
     }
     if (open && e.key === "Escape") {
       e.preventDefault();
-  setOpen(false);
-  anchorNodeRef.current?.focus();
-    }
-  };
-
-  const clearTypeBufferSoon = React.useCallback(() => {
-    if (clearTypeTimerRef.current) {
-      window.clearTimeout(clearTypeTimerRef.current);
-    }
-    clearTypeTimerRef.current = window.setTimeout(() => {
-      typeBufferRef.current = "";
-      if (clearTypeTimerRef.current) {
-        window.clearTimeout(clearTypeTimerRef.current);
-      }
-      clearTypeTimerRef.current = null;
-    }, 700);
-  }, []);
-
-  const updateThumbMetrics = React.useCallback(() => {
-    const el = scrollContainerRef.current;
-    if (!el) return;
-    const { scrollHeight, clientHeight, scrollTop } = el;
-    if (scrollHeight <= clientHeight + 1) {
-      setThumbNeeded(false);
-      if (thumbRef.current) {
-        thumbRef.current.style.height = '0px';
-        thumbRef.current.style.transform = 'translateY(0px)';
-      }
-      return;
-    }
-    setThumbNeeded(true);
-    const trackHeight = clientHeight;
-    const ratio = clientHeight / scrollHeight;
-    const minThumb = 24;
-    const height = Math.max(minThumb, Math.round(ratio * trackHeight));
-    const maxScroll = scrollHeight - clientHeight;
-    const maxThumbTop = trackHeight - height;
-    const top = Math.round((scrollTop / maxScroll) * maxThumbTop);
-    if (thumbRef.current) {
-      thumbRef.current.style.height = `${height}px`;
-      thumbRef.current.style.transform = `translateY(${top}px)`;
-    }
-  }, []);
-
-  const clearThumbHideTimer = React.useCallback(() => {
-    if (thumbHideTimerRef.current) {
-      window.clearTimeout(thumbHideTimerRef.current);
-      thumbHideTimerRef.current = null;
-    }
-  }, []);
-
-  React.useEffect(() => {
-    thumbVisibleRef.current = thumbVisible;
-  }, [thumbVisible]);
-
-  const showThumb = React.useCallback((persistMs: number = 2000) => {
-    updateThumbMetrics();
-    if (!thumbVisibleRef.current) setThumbVisible(true);
-    clearThumbHideTimer();
-    thumbHideTimerRef.current = window.setTimeout(() => {
-      setThumbVisible(false);
-      thumbHideTimerRef.current && window.clearTimeout(thumbHideTimerRef.current);
-      thumbHideTimerRef.current = null;
-    }, persistMs);
-  }, [clearThumbHideTimer, updateThumbMetrics]);
-
-  React.useEffect(() => {
-    if (!open) return;
-    // Update metrics on open and on resize of the scroll container
-    const el = scrollContainerRef.current;
-    if (!el) return;
-    updateThumbMetrics();
-    const ro = new ResizeObserver(() => updateThumbMetrics());
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [open, updateThumbMetrics]);
-
-  const focusItemAtIndex = (index: number) => {
-    const items = listRef.current?.querySelectorAll('[role="menuitem"]');
-    const el = items?.[index] as HTMLElement | undefined;
-    el?.focus();
-    el?.scrollIntoView({ block: "nearest" });
-  };
-
-  const handleMenuListKeyDown: React.KeyboardEventHandler<HTMLUListElement> = (e) => {
-    // Track the last key pressed to prevent Space from triggering click
-    lastKeyPressedRef.current = e.key;
-    
-    // Build a multi-character typeahead buffer including spaces; Enter selects
-    if (e.key === "Enter") {
-      const focused = document.activeElement as HTMLElement | null;
-      if (focused && focused.getAttribute("role") === "menuitem") {
-        e.preventDefault();
-        focused.click();
-      }
-      return;
-    }
-
-    if (e.key === "Backspace") {
-      e.preventDefault();
-      typeBufferRef.current = typeBufferRef.current.slice(0, -1);
-      clearTypeBufferSoon();
-      return;
-    }
-
-    const isChar = e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey;
-    if (isChar) {
-      // Prevent Space from activating the focused MenuItem
-      e.preventDefault();
-      e.stopPropagation();
-      typeBufferRef.current += e.key;
-      const query = typeBufferRef.current.toLowerCase();
-      const idx = COUNTRIES.findIndex((n) => n.toLowerCase().startsWith(query));
-      if (idx >= 0) {
-        focusItemAtIndex(idx);
-      }
-      clearTypeBufferSoon();
+      setOpen(false);
+      anchorNodeRef.current?.focus();
     }
   };
 
@@ -514,147 +376,15 @@ export default function CountrySelect({
           />
         </Box>
 
-        <Popper
+        <AttachedDropdown
           open={open}
           anchorEl={anchorEl}
-          placement="bottom-start"
-          // Keep it visually attached to the field even when scrolling
-          popperOptions={{
-            strategy: "fixed",
-            modifiers: [
-              { name: "offset", options: { offset: [0, 0] } },
-              { name: "flip", enabled: false },
-              { name: "preventOverflow", enabled: false },
-            ],
-          }}
-          sx={{ zIndex: (theme) => theme.zIndex.modal + 1 }}
-        >
-          <ClickAwayListener
-            onClickAway={(event) => {
-              // Ignore clicks on the anchor element
-              if (anchorNodeRef.current && anchorNodeRef.current.contains(event.target as Node)) return;
-              setOpen(false);
-            }}
-          >
-            <Paper
-              elevation={0}
-              sx={{
-                maxHeight: 420,
-                width: menuWidth,
-                borderRadius: 2,
-                // Square the top corners to connect with the input
-                borderTopLeftRadius: 0,
-                borderTopRightRadius: 0,
-                border: "1px solid #e0e0e0",
-                // Remove top border to merge with input
-                borderTop: "none",
-                boxShadow: "0 4px 24px rgba(0,0,0,0.08)",
-                mt: 0,
-                position: "relative",
-              }}
-            >
-              <Box
-                ref={scrollContainerRef}
-                onScroll={() => {
-                  if (scrollRafRef.current) return;
-                  scrollRafRef.current = window.requestAnimationFrame(() => {
-                    scrollRafRef.current && window.cancelAnimationFrame(scrollRafRef.current);
-                    scrollRafRef.current = null;
-                    updateThumbMetrics();
-                  });
-                  showThumb();
-                }}
-                onWheel={() => showThumb()}
-                sx={{
-                  maxHeight: 420,
-                  overflow: "auto",
-                  // Hide native scrollbar entirely; we'll show a custom overlay thumb
-                  "&::-webkit-scrollbar": { display: "none" },
-                  scrollbarWidth: "none",
-                  msOverflowStyle: "none",
-                }}
-              >
-                <MenuList
-                  autoFocusItem
-                  dense
-                  ref={listRef}
-                  role="menu"
-                  // Use capture to intercept keys like Space before MenuItem handles them
-                  onKeyDownCapture={handleMenuListKeyDown}
-                >
-                  {COUNTRIES.map((name, idx) => (
-                    <MenuItem
-                      key={name}
-                      selected={value === name}
-                      onClick={(e) => {
-                        // Prevent selection if triggered by Space key (typeahead mode)
-                        if (lastKeyPressedRef.current === " ") {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          return;
-                        }
-                        handleSelect(name);
-                      }}
-                      role="menuitem"
-                      // Disable MenuItem's built-in keyboard handling
-                      onKeyDown={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                      }}
-                      onKeyUp={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                      }}
-                      sx={{
-                        fontSize: 16,
-                        paddingTop: 1,
-                        paddingBottom: 1,
-                        borderBottom:
-                          idx < COUNTRIES.length - 1 ? "1px solid #f1f1f1" : "none",
-                        // Selection and hover states baked-in (from ClientThemeProvider)
-                        "&.Mui-selected": {
-                          backgroundColor: "rgba(255, 184, 120, 0.25)",
-                        },
-                        "&.Mui-selected:hover": {
-                          backgroundColor: "rgba(255, 184, 120, 0.28)",
-                        },
-                        // Orange-ish focus/hover when navigating via keyboard
-                        "&.Mui-focusVisible": {
-                          backgroundColor: "rgba(255, 184, 120, 0.18)",
-                        },
-                        "&:hover": {
-                          backgroundColor: "rgba(255, 184, 120, 0.18)",
-                        },
-                      }}
-                    >
-                      <ListItemText primary={name} />
-                    </MenuItem>
-                  ))}
-                </MenuList>
-              </Box>
-
-              {thumbNeeded && (
-                <Box
-                  aria-hidden
-                  ref={thumbRef}
-                  sx={{
-                    position: "absolute",
-                    right: 2,
-                    top: 0,
-                    width: 6,
-                    height: 0,
-                    borderRadius: 3,
-                    backgroundColor: "rgba(0,0,0,0.35)",
-                    opacity: thumbVisible ? 1 : 0,
-                    transition: "opacity 180ms ease",
-                    pointerEvents: "none",
-                    willChange: "transform,height,opacity",
-                  }}
-                />
-              )}
-            </Paper>
-          </ClickAwayListener>
-        </Popper>
+          items={COUNTRIES}
+          isSelected={(item) => value === item}
+          onSelect={(item) => handleSelect(item)}
+          onClose={() => setOpen(false)}
+          id={menuId}
+        />
       </FormControl>
 
       {infoMessage && (
